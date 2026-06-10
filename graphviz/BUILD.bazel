@@ -1,0 +1,40 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":defs.bzl", "graphviz_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "defs.bzl",
+    "toolchain_type.bzl",
+    "render.mjs",
+    "graphviz.js",
+])
+
+bzl_library(
+    name = "toolchain_type_bzl",
+    srcs = ["toolchain_type.bzl"],
+)
+
+bzl_library(
+    name = "defs_bzl",
+    srcs = ["defs.bzl"],
+    deps = [":toolchain_type_bzl"],
+)
+
+# Standard Bazel toolchain_type — register an alternate implementation to swap
+# in (e.g.) a native graphviz with the standalone tools / raster output.
+toolchain_type(name = "toolchain_type")
+
+# Default toolchain: the hermetic WASM renderer (graphviz.js) driven by render.mjs
+# under bun. graphviz.js must sit next to render.mjs (the `import "./graphviz.js"`).
+graphviz_toolchain(
+    name = "wasm_graphviz",
+    renderer = "render.mjs",
+    wasm = "graphviz.js",
+)
+
+toolchain(
+    name = "graphviz_toolchain_def",
+    toolchain = ":wasm_graphviz",
+    toolchain_type = ":toolchain_type",
+)

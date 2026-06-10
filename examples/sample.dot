@@ -1,0 +1,7 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  kernel -> engine [label="consumed by"];
+  engine -> codecs;
+  kernel -> Syntax;
+}

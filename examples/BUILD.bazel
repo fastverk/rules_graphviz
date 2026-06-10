@@ -1,0 +1,28 @@
+load("@rules_graphviz//graphviz:defs.bzl", "dot_corpus", "dot_diagram")
+
+package(default_visibility = ["//visibility:public"])
+
+# Default engine (dot) -> svg.
+dot_diagram(
+    name = "sample_svg",
+    src = "sample.dot",
+)
+
+# A different layout engine, hermetically (no host graphviz).
+dot_diagram(
+    name = "sample_neato",
+    src = "sample.dot",
+    engine = "neato",
+)
+
+# Structured output.
+dot_diagram(
+    name = "sample_json",
+    src = "sample.dot",
+    output_format = "json",
+)
+
+dot_corpus(
+    name = "all",
+    srcs = ["sample.dot"],
+)

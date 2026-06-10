@@ -1,0 +1,4 @@
+graphviz/graphviz.js is vendored from @hpcc-js/wasm-graphviz v1.22.0
+(https://github.com/hpcc-systems/hpcc-js-wasm), Apache License 2.0.
+It is Graphviz (https://graphviz.org) compiled to WebAssembly, with the
+WASM inlined into the single JS file. Unmodified.
