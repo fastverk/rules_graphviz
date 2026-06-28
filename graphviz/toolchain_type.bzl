@@ -9,8 +9,13 @@ with the WASM inlined into a single JS file) under a **hermetic bun** runtime
 with zero host dependency, on every platform bun runs on.
 
 Consumers who need the native standalone tools (gvpr/gvpack/tred/…) or raster
-output (png/pdf — not in the WASM build) can register their own toolchain for
+output (png — not in the WASM build) can register their own toolchain for
 `@rules_graphviz//graphviz:toolchain_type` and the rules pick it up unchanged.
+
+Vector **PDF** is available without a native toolchain: `svg_pdf` / `dot_pdf`
+render to SVG with the WASM engine, then convert SVG -> PDF with a vendored,
+self-contained bun bundle (svg2pdf.bundle.js — pdfkit + svg-to-pdfkit, headless,
+no cairo). The bundle rides on the same toolchain (the `svg2pdf` field below).
 """
 
 GraphvizToolchainInfo = provider(
@@ -19,6 +24,9 @@ GraphvizToolchainInfo = provider(
         "renderer": "File — the bun entry script (render.mjs) that drives the WASM engine.",
         "wasm": "File — the @hpcc-js/wasm-graphviz module (graphviz.js, WASM inlined).",
         "engines": "list[str] — Graphviz layout engines this toolchain supports.",
+        "svg2pdf": "File or None — the self-contained bun bundle (svg2pdf.bundle.js) " +
+                   "that converts SVG to vector PDF for svg_pdf/dot_pdf. None if the " +
+                   "toolchain does not provide PDF conversion.",
     },
 )
 

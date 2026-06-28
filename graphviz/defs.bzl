@@ -1,12 +1,15 @@
 """rules_graphviz public API.
 
-- `graphviz_toolchain` — pairs the WASM renderer + bun script with
-  `GraphvizToolchainInfo` so the render rules resolve it via the standard
-  toolchain mechanism. The default (`@rules_graphviz//graphviz:graphviz_toolchain_def`)
-  is registered automatically.
+- `graphviz_toolchain` — pairs the WASM renderer + bun script (and the optional
+  svg2pdf bundle) with `GraphvizToolchainInfo` so the render rules resolve it via
+  the standard toolchain mechanism. The default
+  (`@rules_graphviz//graphviz:graphviz_toolchain_def`) is registered automatically.
 - `dot_diagram` — render one `.dot`/`.gv` file with a chosen layout `engine`
   and `output_format`.
 - `dot_corpus` — fan one `dot_diagram` out per source file.
+- `svg_pdf` — convert one `.svg` to a vector `.pdf` hermetically (bun + the
+  vendored svg2pdf bundle; no host tools, no cairo).
+- `dot_pdf` — render a `.dot`/`.gv` straight to vector `.pdf` (dot -> svg -> pdf).
 """
 
 load(
@@ -25,13 +28,14 @@ def _graphviz_toolchain_impl(ctx):
             renderer = ctx.file.renderer,
             wasm = ctx.file.wasm,
             engines = ctx.attr.engines,
+            svg2pdf = ctx.file.svg2pdf,
         ),
     )]
 
 graphviz_toolchain = rule(
     implementation = _graphviz_toolchain_impl,
-    doc = "Register a hermetic Graphviz renderer (bun script + WASM module) for " +
-          "`@rules_graphviz//graphviz:toolchain_type`.",
+    doc = "Register a hermetic Graphviz renderer (bun script + WASM module, plus " +
+          "the optional svg2pdf bundle) for `@rules_graphviz//graphviz:toolchain_type`.",
     attrs = {
         "renderer": attr.label(
             allow_single_file = True,
@@ -48,8 +52,78 @@ graphviz_toolchain = rule(
             default = LAYOUT_ENGINES,
             doc = "Layout engines this toolchain supports.",
         ),
+        "svg2pdf": attr.label(
+            allow_single_file = True,
+            doc = "Self-contained bun bundle (svg2pdf.bundle.js) that converts SVG " +
+                  "to vector PDF. Optional; required only for svg_pdf / dot_pdf.",
+        ),
     },
 )
+
+def _svg_pdf_impl(ctx):
+    gv = ctx.toolchains[GRAPHVIZ_TOOLCHAIN_TYPE].graphviz_info
+    bun = ctx.toolchains[_BUN_TOOLCHAIN_TYPE].buninfo.bun
+
+    if not gv.svg2pdf:
+        fail("rules_graphviz: the resolved toolchain has no svg2pdf bundle; " +
+             "svg_pdf/dot_pdf need a toolchain with the `svg2pdf` attribute set.")
+
+    out = ctx.actions.declare_file(ctx.label.name + ".pdf")
+
+    args = ctx.actions.args()
+    args.add(gv.svg2pdf)
+    args.add(ctx.file.src)
+    args.add("-o", out)
+
+    ctx.actions.run(
+        executable = bun,
+        arguments = [args],
+        inputs = [ctx.file.src, gv.svg2pdf],
+        outputs = [out],
+        mnemonic = "SvgToPdf",
+        progress_message = "svg2pdf %{label}",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+svg_pdf = rule(
+    implementation = _svg_pdf_impl,
+    doc = "Convert a single `.svg` to a vector `.pdf` hermetically (bun + the " +
+          "vendored svg2pdf bundle — no host tools, no cairo). The page is sized " +
+          "to the SVG's viewBox.",
+    attrs = {
+        "src": attr.label(
+            allow_single_file = [".svg"],
+            mandatory = True,
+            doc = "An SVG file (e.g. the output of a dot_diagram).",
+        ),
+    },
+    toolchains = [GRAPHVIZ_TOOLCHAIN_TYPE, _BUN_TOOLCHAIN_TYPE],
+)
+
+def dot_pdf(name, src, engine = "dot", **kwargs):
+    """Render a `.dot`/`.gv` straight to a vector `.pdf` (dot -> svg -> pdf).
+
+    Produces a target `name` whose output is `<name>.pdf`. Internally renders
+    the SVG with the WASM engine (`<name>__svg`) and converts it with `svg_pdf`.
+
+    Args:
+      name: target name; output is `<name>.pdf`.
+      src: a `.dot`/`.gv` label.
+      engine: layout engine (dot/neato/fdp/sfdp/twopi/circo/osage/patchwork).
+      **kwargs: forwarded to both rules (visibility, tags, …).
+    """
+    dot_diagram(
+        name = name + "__svg",
+        src = src,
+        engine = engine,
+        output_format = "svg",
+        **{k: v for k, v in kwargs.items() if k in ("visibility", "tags")}
+    )
+    svg_pdf(
+        name = name,
+        src = ":" + name + "__svg",
+        **kwargs
+    )
 
 def _dot_diagram_impl(ctx):
     gv = ctx.toolchains[GRAPHVIZ_TOOLCHAIN_TYPE].graphviz_info

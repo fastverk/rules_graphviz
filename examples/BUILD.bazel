@@ -1,4 +1,4 @@
-load("@rules_graphviz//graphviz:defs.bzl", "dot_corpus", "dot_diagram")
+load("@rules_graphviz//graphviz:defs.bzl", "dot_corpus", "dot_diagram", "dot_pdf", "svg_pdf")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -25,4 +25,16 @@ dot_diagram(
 dot_corpus(
     name = "all",
     srcs = ["sample.dot"],
+)
+
+# Vector PDF straight from .dot (dot -> svg -> pdf), hermetic — no host tools.
+dot_pdf(
+    name = "sample_pdf",
+    src = "sample.dot",
+)
+
+# Or convert an existing SVG (here, the dot_diagram output above) to PDF.
+svg_pdf(
+    name = "sample_svg_pdf",
+    src = ":sample_svg",
 )

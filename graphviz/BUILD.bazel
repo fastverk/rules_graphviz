@@ -8,6 +8,8 @@ exports_files([
     "toolchain_type.bzl",
     "render.mjs",
     "graphviz.js",
+    "svg2pdf.mjs",
+    "svg2pdf.bundle.js",
 ])
 
 bzl_library(
@@ -27,9 +29,11 @@ toolchain_type(name = "toolchain_type")
 
 # Default toolchain: the hermetic WASM renderer (graphviz.js) driven by render.mjs
 # under bun. graphviz.js must sit next to render.mjs (the `import "./graphviz.js"`).
+# svg2pdf.bundle.js is the self-contained bun bundle that backs svg_pdf/dot_pdf.
 graphviz_toolchain(
     name = "wasm_graphviz",
     renderer = "render.mjs",
+    svg2pdf = "svg2pdf.bundle.js",
     wasm = "graphviz.js",
 )
 
